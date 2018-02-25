@@ -8,6 +8,7 @@ open Microsoft.Extensions.Primitives
 open Microsoft.AspNetCore.Http.Features
 open Microsoft.AspNetCore.Http.Internal
 open System.Collections.Generic
+open Microsoft.FSharp.Reflection
 
 [<TestClass>]
 type Routing() =
@@ -31,11 +32,17 @@ type Routing() =
                 new System.Security.Claims.ClaimsIdentity(claims)
         )
 
+    let caseName (x : 'a) =
+        match FSharpValue.GetUnionFields(x, typeof<'a>) with
+            | case, _ -> case.Name
+
     let printFail (expected : 'a) (actual : 'a) =
         sprintf "\r\n\r\nEXPECTED\r\n%A\r\n\r\nACTUAL\r\n%A\r\n" expected actual
 
+
     let areEqual (expected: 'a) (actual: 'a) =
          Assert.IsTrue((expected = actual), printFail expected actual)
+
 
     let isNone (a : 'a option) =
         match a with
@@ -53,6 +60,41 @@ type Routing() =
 
             | None ->
                 Assert.Fail(sprintf "\r\n\r\nEXPECTED\r\nSome ...\r\n\r\nACTUAL\r\n%A\r\n" a)
+
+
+    let testResponse expected actual =
+        areEqual expected.StatusCode actual.StatusCode
+        areEqual expected.StatusMessage actual.StatusMessage
+        areEqual expected.Headers actual.Headers
+
+    let testHandler expected (contextOpt : RouteContext option) =
+        match contextOpt with
+            | None ->
+                isSome contextOpt
+
+            | Some context ->
+                match context.Handler with
+                    | None ->
+                        isSome context.Handler
+
+                    | Some handler ->
+                        // TODO check body
+                        match handler with
+                            | RespondNow actual ->
+                                testResponse expected actual
+
+                            | RespondAfter g ->
+                                let actual = g context.HttpContext
+                                testResponse expected actual
+
+                            | RespondAfterAsync g ->
+                                let actual = g context.HttpContext |> Async.RunSynchronously
+                                testResponse expected actual
+
+                            | RespondAfterTask g ->
+                                let actual = (g context.HttpContext).Result
+                                testResponse expected actual
+
 
     (*
         andThen
@@ -534,14 +576,14 @@ type Routing() =
     member __.``contentType returns Some if content type does match`` () =
         let ctx = getContext ()
         ctx.HttpContext.Request.ContentType <- "application/json"
-        let actual = contentType "application/json" ctx
+        let actual = Routing.contentType "application/json" ctx
         isSome actual
 
     [<TestMethod>]
     member __.``contentType returns None if content type does not match`` () =
         let ctx = getContext ()
         ctx.HttpContext.Request.ContentType <- "application/json"
-        let actual = contentType "text/plain" ctx
+        let actual = Routing.contentType "text/plain" ctx
         isNone actual
 
 
@@ -990,5 +1032,42 @@ type Routing() =
         let actual = claim "unsubstantiated" "deed" ctx
         isNone actual
 
+
+    (*
+        handlers
+    *)
+
+    [<TestMethod>]
+    member __.``handler is properly set`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 201 }
+        let actual = handler (fun _ -> response [statusCode 201]) ctx
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``handlerAsync is properly set`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 202 }
+        let actual = handlerAsync (fun _ -> response [statusCode 202] |> async.Return) ctx
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``handlerTask is properly set`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 203 }
+        let actual = handlerTask (fun _ -> response [statusCode 203] |> System.Threading.Tasks.Task.FromResult) ctx
+        testHandler expected actual
+
+
+    (*
+        stopWith
+    *)
+
+    [<TestMethod>]
+    member __.``stopWith is properly set`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 204 }
+        let actual = stopWith [statusCode 204] ctx
+        testHandler expected actual
 
     

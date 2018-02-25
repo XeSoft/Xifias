@@ -1,6 +1,6 @@
 namespace Xifias
 
-//[<AutoOpen>]
+[<AutoOpen>]
 module Responses =
 
     open System.IO
