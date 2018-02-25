@@ -293,55 +293,22 @@ module Routing =
     /// Match the route when there is an authenticated user present on the request.
     /// If there is no authenticated user, stop matching other routes and return a 401 immediately.
     let stopUnlessAuthenticated =
-    #if DEBUG
-        let toText = sprintf "%s requires authentication"
-        authenticated
-            <|> ( fun context ->
-                    stopWith [
-                        statusCode 401
-                        contentText (toText (context.HttpContext.Request.Path.ToString()))
-                    ] context
-                )
-    #else
         authenticated
             <|> stopWith [ statusCode 401 ]
-    #endif
 
 
     /// Match the route when there is a user with the provided claim type present on the request.
     /// If the claim type is not present, stop matching other routes and return 403 immediately.
     let stopUnlessClaimType (typeName : string) =
-    #if DEBUG
-        let toText = sprintf "%s requires claim %s"
-        claimType typeName
-            <|> ( fun context ->
-                    stopWith [
-                        statusCode 403
-                        contentText (toText (context.HttpContext.Request.Path.ToString()) typeName)
-                    ] context
-                )
-    #else
         claimType typeName
             <|> stopWith [ statusCode 403 ]
-    #endif
 
 
     /// Match the route when there is a user with the exact provided claim present on the request.
     /// If the exact claim is not present, stop matching other routes and return 403 immediately.
     let stopUnlessClaim (typeName : string) (value : string) =
-    #if DEBUG
-        let toText = sprintf "%s requires claim %s with value %s"
-        claim typeName value
-            <|> ( fun context ->
-                    stopWith [
-                        statusCode 403
-                        contentText (toText (context.HttpContext.Request.Path.ToString()) typeName value)
-                    ] context
-                )
-    #else
         claim typeName value
             <|> stopWith [ statusCode 403 ]
-    #endif
 
 
     /// Matches the route when it is over a secure connection.

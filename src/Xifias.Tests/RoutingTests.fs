@@ -1070,4 +1070,98 @@ type Routing() =
         let actual = stopWith [statusCode 204] ctx
         testHandler expected actual
 
+
+    (*
+        stopUnlessAuthenticated
+    *)
+
+    [<TestMethod>]
+    member __.``stopUnlessAuthenticated keeps going when authenticated`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 201 }
+        ctx.HttpContext.User <- userWithClaims true [("quit", "deed")]
+        let actual = stopUnlessAuthenticated ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``stopUnlessAuthenticated returns 401 when not authenticated`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 401 }
+        ctx.HttpContext.User <- userWithClaims false [("quit", "deed")]
+        let actual = stopUnlessAuthenticated ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+
+    (*
+        stopUnlessClaimType
+    *)
+
+    [<TestMethod>]
+    member __.``stopUnlessClaimType keeps going when user has provided claim type`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 201 }
+        ctx.HttpContext.User <- userWithClaims false [("quit", "deed")]
+        let actual = stopUnlessClaimType "quit" ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``stopUnlessClaimType returns 403 when user does not have provided claim type`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 403 }
+        ctx.HttpContext.User <- userWithClaims false [("quit", "deed")]
+        let actual = stopUnlessClaimType "unsubstantiated" ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+
+    (*
+        stopUnlessClaim
+    *)
+
+    [<TestMethod>]
+    member __.``stopUnlessClaim keeps going when user has provided claim type and value`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 201 }
+        ctx.HttpContext.User <- userWithClaims true [("quit", "deed")]
+        let actual = stopUnlessClaim "quit" "deed" ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``stopUnlessClaim returns 403 when user has provided claim type with a different value`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 403 }
+        ctx.HttpContext.User <- userWithClaims false [("quit", "deed")]
+        let actual = stopUnlessClaim "quit" "quitting" ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``stopUnlessClaim returns 403 when user does not have provided claim type`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 403 }
+        ctx.HttpContext.User <- userWithClaims false [("quit", "deed")]
+        let actual = stopUnlessClaim "unsubstantiated" "deed" ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+
+    (*
+        redirectIfNotHttps
+    *)
+
+    [<TestMethod>]
+    member __.``redirectIfNotHttps keeps going when scheme is https`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 201 }
+        let req = ctx.HttpContext.Features.Get<IHttpRequestFeature>()
+        req.Scheme <- "https"
+        let actual = redirectIfNotHttps ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
+    [<TestMethod>]
+    member __.``redirectIfNotHttps redirect when scheme is not https`` () =
+        let ctx = getContext ()
+        let expected = { RouteResponse.ok with StatusCode = 301; Headers = [("Location", box (StringValues("https://")))] }
+        let req = ctx.HttpContext.Features.Get<IHttpRequestFeature>()
+        req.Scheme <- "http"
+        let actual = redirectIfNotHttps ctx >>= handler (fun _ -> response [ statusCode 201 ])
+        testHandler expected actual
+
     
