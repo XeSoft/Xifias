@@ -5,6 +5,8 @@ open Xifias.UrlParser
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Internal
 open Xifias.Tests.Helpers
+open Microsoft.Extensions.Primitives
+open System.Collections.Generic
 
 
 type TestRecord = { Stringy : string; Inty : int }
@@ -142,5 +144,107 @@ type UrlParsing() =
         let actual = parse recordParser q "/test/asdf/id/321"
         areEqual (Some (createRecord "asdf" 321)) actual
 
+
+    (*
+        stringParam parser
+    *)
+
+    [<TestMethod>]
+    member __.``stringParam parser returns Some when provided query parameter is present`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("value"))]))
+        let actual = parse (s "test" <?> stringParam "key") q "/test" |> Option.bind id
+        areEqual (Some "value") actual
+
+    [<TestMethod>]
+    member __.``stringParam parser returns Some when provided query parameter is present - blank version`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues(""))]))
+        let actual = parse (s "test" <?> stringParam "key") q "/test" |> Option.bind id
+        areEqual (Some "") actual
+
+    [<TestMethod>]
+    member __.``stringParam parser returns None when provided query parameter is not present`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>())
+        let actual = parse (s "test" <?> stringParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+
+    (*
+        intParam parser
+    *)
+
+    [<TestMethod>]
+    member __.``intParam parser returns Some when provided query parameter is present`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("234"))]))
+        let actual = parse (s "test" <?> intParam "key") q "/test" |> Option.bind id
+        areEqual (Some 234) actual
+
+    [<TestMethod>]
+    member __.``intParam parser returns None when provided query parameter is present but not a number`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("foo"))]))
+        let actual = parse (s "test" <?> intParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+    [<TestMethod>]
+    member __.``intParam parser returns None when provided query parameter is not present`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>())
+        let actual = parse (s "test" <?> intParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+
+    (*
+        guidParam parser
+    *)
+
+    [<TestMethod>]
+    member __.``guidParam parser returns Some when provided query parameter is present - no dashes`` () =
+        let x = System.Guid.NewGuid()
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues(x.ToString("N")))]))
+        let actual = parse (s "test" <?> guidParam "key") q "/test" |> Option.bind id
+        areEqual (Some x) actual
+
+    [<TestMethod>]
+    member __.``guidParam parser returns Some when provided query parameter is present with dashes`` () =
+        let x = System.Guid.NewGuid()
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues(x.ToString()))]))
+        let actual = parse (s "test" <?> guidParam "key") q "/test" |> Option.bind id
+        areEqual (Some x) actual
+
+    [<TestMethod>]
+    member __.``guidParam parser returns None when provided query parameter is present but not a guid`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("foo"))]))
+        let actual = parse (s "test" <?> guidParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+    [<TestMethod>]
+    member __.``guidParam parser returns None when provided query parameter is not present`` () =
+        let q = QueryCollection(new Dictionary<string, StringValues>())
+        let actual = parse (s "test" <?> guidParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+
+    (*
+        customParam parser
+    *)
+
+    [<TestMethod>]
+    member __.``customParam parser returns Some when provided query parameter is present`` () =
+        let floatParam name = customParam name (Option.bind (fun s -> match System.Double.TryParse s with | false, _ -> None | true, f -> Some f))
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("234.56"))]))
+        let actual = parse (s "test" <?> floatParam "key") q "/test" |> Option.bind id
+        areEqual (Some 234.56) actual
+
+    [<TestMethod>]
+    member __.``customParam parser returns None when provided query parameter is present but not a number`` () =
+        let floatParam name = customParam name (Option.bind (fun s -> match System.Double.TryParse s with | false, _ -> None | true, f -> Some f))
+        let q = QueryCollection(new Dictionary<string, StringValues>(dict [("key", StringValues("foo"))]))
+        let actual = parse (s "test" <?> floatParam "key") q "/test" |> Option.bind id
+        areEqual None actual
+
+    [<TestMethod>]
+    member __.``customParam parser returns None when provided query parameter is not present`` () =
+        let floatParam name = customParam name (Option.bind (fun s -> match System.Double.TryParse s with | false, _ -> None | true, f -> Some f))
+        let q = QueryCollection(new Dictionary<string, StringValues>())
+        let actual = parse (s "test" <?> floatParam "key") q "/test" |> Option.bind id
+        areEqual None actual
 
 
