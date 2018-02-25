@@ -113,7 +113,7 @@ module UrlParser =
     *)
 
 
-    let custom _ toResult =
+    let custom toResult =
         Parser
             (
                 fun { Visited = visited; Unvisited = unvisited; Params = ps; Value = value } ->
@@ -137,15 +137,15 @@ module UrlParser =
 
 
     let string<'a> : Parser<string -> 'a, 'a> =
-        custom "STRING" (fun s -> if s = "" then Error "empty string" else Ok s)
+        custom (fun s -> if s = "" then Error "empty string" else Ok s)
 
 
     let int<'a> : Parser<int -> 'a, 'a> =
-        custom "NUMBER" Internal.intParse
+        custom Internal.intParse
 
 
     let guid<'a> : Parser<System.Guid -> 'a, 'a> =
-        custom "GUID" Internal.guidParse
+        custom Internal.guidParse
 
 
     (*
@@ -240,7 +240,7 @@ module UrlParser =
     *)
 
     
-    let parse (Parser parser) url ps =
+    let parse (Parser parser) ps url =
         Internal.parseHelp
             ( parser
                 (
@@ -255,4 +255,4 @@ module UrlParser =
 
 
     let parseFromContext parser (context : HttpContext) =
-        parse parser (context.Request.Path.ToString()) context.Request.Query
+        parse parser context.Request.Query (context.Request.Path.ToString())

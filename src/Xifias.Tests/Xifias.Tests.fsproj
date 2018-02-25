@@ -6,6 +6,8 @@
     <ProjectReference Include="..\Xifias\Xifias.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Helpers.fs" />
+    <Compile Include="UrlParserTests.fs" />
     <Compile Include="RoutingTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
