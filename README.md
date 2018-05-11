@@ -238,7 +238,7 @@ let apiRoute =
 
 ### `<|>` or `orElse`
 
-This function, _called `tryThen` in Suave, tries a handler then if it will not handle the request, the fallback handler is used. It is equivalent to using the `oneOf` operator with only two options. We could rewrite the oneOf example above using this operator. However, it is better used in short expressions.
+This function, _called `tryThen` in Suave_, tries a handler then if it will not handle the request, the fallback handler is used. It is equivalent to using the `oneOf` operator with only two options. We could rewrite the oneOf example above using this operator. However, it is better used in short expressions.
 
 Here is an example which checks for authentication and if that fails, then it responds with an error. This is almost the same as the built-in `requireAuthentication` route handler.
 
@@ -547,7 +547,7 @@ let myApiCode (context : HttpContext) =
     }
 
 // route might look like this
-POST >=> path "/something" >=> handler MyApiModule.myApiCode >=> requireAuthentication
+POST >=> path "/something" >=> handlerAsync myApiCode >=> requireAuthentication
 ```
 
 TODO CORS
