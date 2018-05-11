@@ -287,7 +287,7 @@ let route1 =
     handler hopesWillBeDashed >=> stopWith [ statusCode 410 ]
 
 let route2 =
-    repond [ statusCode 410 ] >=> handler neverGonnaHappen
+    stopWith [ statusCode 410 ] >=> handler neverGonnaHappen
 ```
 
 However, `stopWith` will overwrite previous uses of `stopWith`.
