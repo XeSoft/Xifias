@@ -136,7 +136,7 @@ This is used inside of `RouteHandler`s. See below for examples.
 
 An type of function with the definition `RouteContext -> RouteContext option`.
 
-This is where you access the `RouteContext`. The two things to do with `RouteContext` are to check the underlying `HttpContext` for filtering purposes and setting the `ResponseDecision`. Then you decide whether to return `Some context` if the request is approved or `None` to deny it.
+This is where you access the `RouteContext`. The two things to do with `RouteContext` are to check the underlying `HttpContext` for filtering purposes and setting the `ResponseDecision`. Then you decide whether to return `Some context` if you want to handle the request or `None` to skip it.
 
 Example usage
 
@@ -165,7 +165,7 @@ let teaTime (context: RouteContext) =
 
 ## Operators
 
-Here are the operators defined by the library for routing. Their correspodning functions are also listed and demonstrated.
+Here are the operators defined by the library for routing. Their corresponding functions are also listed and demonstrated.
 
 > _For those who are not familiar with the operators below, note that they were not chosen arbitrary. They are somewhat well-known for the kind of function they perform. Here they are used on `option` types, but you may readily observe them being used for nearly the same thing in other functional languages or on other types. For more information, check out Scott Wlaschin's [series on the "Elevated World"](https://fsharpforfunandprofit.com/posts/elevated-world/)._
 
