@@ -1,10 +1,5 @@
 namespace Xifias
 
-(**
-
-This module contains common routing helpers and operators for defining API routes.
-
-*)
 [<AutoOpen>]
 module Routing =
 
@@ -77,7 +72,7 @@ module Routing =
     ///     nginx, IIS, or a cloud API gateway provider -- this will match the reverse proxy address, not the client IP.
     ///</remarks>
     let remoteIp ip =
-        filterValue RequestHelp.remoteIp ip
+        filterValue Request.remoteIp ip
 
 
     /// <summary>Match the request if it has the provided remote port.</summary>
@@ -87,22 +82,22 @@ module Routing =
     ///     nginx, IIS, or a cloud API gateway provider -- this will match the reverse proxy address, not the client IP.
     ///</remarks>
     let remotePort port =
-        filterValue RequestHelp.remotePort port
+        filterValue Request.remotePort port
 
 
     /// Match the request if it has the provided local IP.
     let localIp ip =
-        filterValue RequestHelp.localIp ip
+        filterValue Request.localIp ip
 
 
     /// Match the request if it has the provided local port.
     let localPort port =
-        filterValue RequestHelp.localPort port
+        filterValue Request.localPort port
 
 
     /// Match the request if the client certificate matches the provided condition.
     let clientCertificateFilter certf =
-        filter (RequestHelp.clientCertificate >> certf)
+        filter (Request.clientCertificate >> certf)
 
 
     /// <summary>Match the request if the name on the Host header matches the provided value.</summary>
@@ -111,7 +106,7 @@ module Routing =
     /// NOTE: This value is may be provided by the client, rendering it insecure. Use with caution.
     /// </remarks>
     let hostName (s : string) =
-        filterValue RequestHelp.hostName s
+        filterValue Request.hostName s
 
 
     /// <summary>Match the request if the port on the Host header matches the provided value.</summary>
@@ -120,23 +115,23 @@ module Routing =
     /// NOTE: This value is may be provided by the client, rendering it insecure. Use with caution.
     /// </remarks>
     let hostPort (i : int option) =
-        filterValue RequestHelp.hostPort i
+        filterValue Request.hostPort i
 
 
     /// Match the request if it matches the provided condition
     let headerFilter filterf =
         // not the most efficient
-        filter (RequestHelp.headerFilter (fun n v -> if filterf n v then Some () else None) >> RequestHelp.toBool)
+        filter (Request.headerFilter (fun n v -> if filterf n v then Some () else None) >> Request.toBool)
 
 
     /// Match the request if it has the provided header name and the value matches the provided condition.
     let headerValueFilter name valuef =
-        filter (RequestHelp.headerValue name >> Option.map valuef >> Option.defaultValue false)
+        filter (Request.headerValue name >> Option.map valuef >> Option.defaultValue false)
 
 
     /// Match the request if it has the provided header name
     let headerName (name : string) =
-        filter (RequestHelp.hasHeaderName name)
+        filter (Request.hasHeaderName name)
 
 
     /// Match the request if it has the provided header and value.
@@ -157,55 +152,55 @@ module Routing =
     /// </remarks>
     let clientIpFromHeader (headerName : string) (ipString : string) =
         filter (
-            RequestHelp.clientIpFromHeader headerName
-                >> Option.map (fun ip -> Some ip = RequestHelp.parseIp ipString)
+            Request.clientIpFromHeader headerName
+                >> Option.map (fun ip -> Some ip = Request.parseIp ipString)
                 >> Option.defaultValue false
         )
 
 
     /// Match the request if it has the provided content type.
     let contentType (typeName : string) =
-        filterValue RequestHelp.contentType (Some typeName)
+        filterValue Request.contentType (Some typeName)
 
 
     /// Match the request if a cookie is present with the provided name and matches the provided condition.
     let cookieFilter filterf =
-        filter (RequestHelp.cookieFilter (fun n v -> if filterf n v then Some () else None) >> RequestHelp.toBool)
+        filter (Request.cookieFilter (fun n v -> if filterf n v then Some () else None) >> Request.toBool)
 
 
     /// Match the request if it has the provided cookie name and the value matches the provided condition.
     let cookieValueFilter name valuef =
-        filter (RequestHelp.cookieValue name >> Option.map valuef >> Option.defaultValue false)
+        filter (Request.cookieValue name >> Option.map valuef >> Option.defaultValue false)
 
 
     /// Match the request if a cookie is present with the provided name.
     let cookieName name =
-        filter (RequestHelp.hasCookieName name)
+        filter (Request.hasCookieName name)
 
 
     /// Match the request if a cookie is present with the provided name and value.
     let cookieValue name value =
-        filter (RequestHelp.cookieValue name >> (fun v -> v = Some value))
+        filter (Request.cookieValue name >> (fun v -> v = Some value))
 
 
-    /// Match the request if it is HTTPS protocol. This is verified by the presence of a secure connection rather than the URL scheme.
+    /// Match the request if it is using the HTTPS protocol.
     let isHttps =
-        filter RequestHelp.isHttp
+        filter Request.isHttp
 
 
     /// Match the request if it uses the provided scheme. For example: in http://my.foo:123/bar, "http" is the scheme
     let scheme s =
-        filterValue RequestHelp.scheme s
+        filterValue Request.scheme s
 
 
     /// Match the request if it uses the provided protocol. For example: HTTP/1.1
     let protocol s =
-        filterValue RequestHelp.protocol s
+        filterValue Request.protocol s
 
 
     /// Match the request if it uses the provide HTTP method. Examples: GET, POST
     let httpVerb (verb : string) =
-        filterValue RequestHelp.verb verb
+        filterValue Request.verb verb
 
 
     /// Match the request if it uses the GET method.
@@ -252,13 +247,13 @@ module Routing =
     /// Match the request if it has a user with the given type of claim.
     /// Populating claims is expected to be handled by other middleware, such as Microsoft.AspNetCore.Authentication.*.
     let claimType (typeName : string) =
-        filter (RequestHelp.hasClaimOfType typeName)
+        filter (Request.hasClaimOfType typeName)
 
 
     /// Match the request if it has a user with the given exact claim (type and value).
     /// Populating claims is expected to be handled by other middleware, such as Microsoft.AspNetCore.Authentication.*.
     let claim (typeName: string) (value : string) =
-        filter (RequestHelp.hasClaim typeName value)
+        filter (Request.hasClaim typeName value)
             
 
     let private ifNotResponded response (context : RouteContext) =
@@ -271,44 +266,59 @@ module Routing =
 
 
     /// Set the synchronous handler which will process this request. This handler will not be executed until after all parts of the route are matched.
-    let handler (func : HttpContext -> RouteResponse) (context : RouteContext) =
+    let handler (func : HttpContext -> Response) (context : RouteContext) =
         ifNotResponded (RespondAfter func) context
 
 
     /// Set the Async-returning handler which will process this request. This handler will not be executed until after all parts of the route are matched.
-    let handlerAsync (func : HttpContext -> Async<RouteResponse>) (context : RouteContext) =
+    let handlerAsync (func : HttpContext -> Async<Response>) (context : RouteContext) =
         ifNotResponded (RespondAfterAsync func) context
     
 
     /// Set the Task-returning handler which will process the request. This handler will not be executed until after all parts of the route are matched.
-    let handlerTask (func : HttpContext -> Task<RouteResponse>) (context : RouteContext) =
+    let handlerTask (func : HttpContext -> Task<Response>) (context : RouteContext) =
         ifNotResponded (RespondAfterTask func) context
 
 
+    /// Return the provided response.
+    let respond (response : Response) (context : RouteContext) =
+        ifNotResponded (RespondAfter (fun _ -> response)) context
+
+
+    /// Return the provided response description.
+    let respondWith (responseItems : (Response -> Response) list) (context : RouteContext) =
+        ifNotResponded (RespondAfter (fun _ -> response responseItems)) context
+
+
     /// Stop matching routes and return the provided response immediately.
-    let stopWith (responseItems : (RouteResponse -> RouteResponse) list) (context : RouteContext) =
-        Some { context with Handler = Some (RespondNow (response responseItems)) }
+    let stop (response : Response) (context : RouteContext) =
+        ifNotResponded (RespondNow response) context
+
+
+    /// Stop matching routes and return the provided response description immediately.
+    let stopWith (responseItems : (Response -> Response) list) (context : RouteContext) =
+        ifNotResponded (RespondNow (response responseItems)) context
 
 
     /// Match the route when there is an authenticated user present on the request.
     /// If there is no authenticated user, stop matching other routes and return a 401 immediately.
     let stopUnlessAuthenticated =
         authenticated
-            <|> stopWith [ statusCode 401 ]
+            <|> stopWith [ statusCodeInt 401 ]
 
 
     /// Match the route when there is a user with the provided claim type present on the request.
     /// If the claim type is not present, stop matching other routes and return 403 immediately.
     let stopUnlessClaimType (typeName : string) =
         claimType typeName
-            <|> stopWith [ statusCode 403 ]
+            <|> stopWith [ statusCodeInt 403 ]
 
 
     /// Match the route when there is a user with the exact provided claim present on the request.
     /// If the exact claim is not present, stop matching other routes and return 403 immediately.
     let stopUnlessClaim (typeName : string) (value : string) =
         claim typeName value
-            <|> stopWith [ statusCode 403 ]
+            <|> stopWith [ statusCodeInt 403 ]
 
 
     /// Matches the route when it is over a secure connection.
@@ -327,6 +337,3 @@ module Routing =
                             .ToString()
 
                     stopWith [ redirectPermanent location ] context
-    
-
-

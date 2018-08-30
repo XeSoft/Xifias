@@ -12,47 +12,53 @@ module Responses =
 
     module Internal =
 
-        let setBody body (response : RouteResponse) =
+        let setBody body (response : Response) =
             { response with Body = Some body }
 
 
     /// <summary>Create a response with the provided list of response options.</summary>
     /// <remarks>Example: <c>response [ statusCode 200 ]</c>
-    let response (changes : (RouteResponse -> RouteResponse) list) =
-        List.fold (fun response f -> f response) RouteResponse.ok changes
+    let response (changes : (Response -> Response) list) =
+        List.fold (fun response f -> f response) Response.ok changes
 
 
     /// Set the status code of the response.
     /// Example: <c>response [ statusCode 200 ]</c>
-    let statusCode (statusCode : int) (response : RouteResponse) =
+    let statusCodeInt (statusCode : int) (response : Response) =
         { response with StatusCode = statusCode }
+
+
+    /// Set the status code of the response.
+    /// Example: <c> response [ statusCode HttpStatusCode.BadRequest ]
+    let statusCode (statusCode : System.Net.HttpStatusCode) (response: Response) =
+        { response with StatusCode = int statusCode }
 
 
     /// <summary>Set the status message of the response.
     /// Example: <c>response [ statusCode 200; statusMessage "okie dokie" ]</c></summary>
     /// <remarks>NOTE: You should probably not depend on a custom Status Message aka Reason Phrase to convey extra information. It is commonly ignored by browsers, for example.</remarks>
-    let statusMessage (reason : string) (response : RouteResponse) =
+    let statusMessage (reason : string) (response : Response) =
         { response with StatusMessage = Some reason }
 
 
     /// <summary>Set a header in the response.
     /// Example: <c>response [ statusCode 200; header "My-Header" "HeaderValue" ]</c></summary>
     /// <remarks>Setting the same header multiple times will overwrite the previous header.</remarks>
-    let header (key : string) (value : obj) (response : RouteResponse) =
+    let header (key : string) (value : obj) (response : Response) =
         { response with Headers = (key, value) :: response.Headers }
 
 
     /// <summary>Set the response to be a temporary redirect to the provided location.</summary>
     /// <remarks>This sets the status code to 302, and sets the Location header.</remarks>
     let redirect (location : string) =
-        statusCode 302
+        statusCodeInt 302
             >> header HeaderNames.Location location
 
 
     /// <summary>Set the response to be a permanent redirect to the provided location.</summary>
     /// <remarks>This sets the status code to 301, and sets the Location header.</remarks>
     let redirectPermanent (location : string) =
-        statusCode 301
+        statusCodeInt 301
             >> header HeaderNames.Location location
 
 
@@ -71,7 +77,7 @@ module Responses =
     /// This will send a chunked response since the length of the stream is not known.
     /// If the stream is write-only or closed, the response will return a 501 with a note in the headers.
     /// </remarks>
-    let bodyStream (stream : Stream) (response : RouteResponse) =
+    let bodyStream (stream : Stream) (response : Response) =
         Internal.setBody (SetBodyStream stream) response
 
 
@@ -82,7 +88,7 @@ module Responses =
 
 
     /// Write a string to the response body.
-    let bodyString (s : string) (response : RouteResponse) =
+    let bodyString (s : string) (response : Response) =
         bodyBytes (Encoding.UTF8.GetBytes s) response
 
 
@@ -91,7 +97,7 @@ module Responses =
     /// This will send a chunked response since the length of the stream is not known.
     /// This is appropriate to use when you need to send a large response, such as a file.
     /// </remarks>
-    let bodyWriterAsync (writerAsync : Stream -> Async<unit>) (response : RouteResponse) =
+    let bodyWriterAsync (writerAsync : Stream -> Async<unit>) (response : Response) =
         Internal.setBody (WriteBodyStreamAsync writerAsync) response
 
 
@@ -100,7 +106,7 @@ module Responses =
     /// This will send a chunked response since the length of the stream is not known.
     /// This is appropriate to use when you need to send a large response, such as a file.
     /// </remarks>
-    let bodyWriterTask (writerTask : Stream -> System.Threading.Tasks.Task) (response : RouteResponse) =
+    let bodyWriterTask (writerTask : Stream -> System.Threading.Tasks.Task) (response : Response) =
         Internal.setBody (WriteBodyStreamTask writerTask) response
 
 
@@ -120,3 +126,8 @@ module Responses =
         contentType "application/json"
             >> bodyString bodyJson
 
+
+    /// Write raw bytes to the response body and set the content type to "application/json".
+    let contentJsonBytes (bytes : byte[]) =
+        contentType "application/json"
+            >> bodyBytes bytes

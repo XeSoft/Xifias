@@ -1,5 +1,8 @@
 namespace Xifias
 
+// ported from https://github.com/evancz/url-parser
+// under BSD 3-clause license
+
 [<AutoOpen>]
 module UrlParser =
 
@@ -107,9 +110,7 @@ module UrlParser =
 
     
     (*
-    
         Path parsing
-
     *)
 
 
@@ -149,9 +150,7 @@ module UrlParser =
 
 
     (*
-    
         Parameter parsing
-
     *)
 
     let s (st : string) =
@@ -234,9 +233,7 @@ module UrlParser =
 
 
     (*
-    
         Running a parse
-
     *)
 
     

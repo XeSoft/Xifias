@@ -39,9 +39,7 @@ module ResponseMutation =
         
             I chased down the Kestrel source code (shown below) to make sure I don't have to flush the stream.
             Confirmed: The stream is automatically flushed on both HTTP 1 and HTTP 2 protocols.
-
             ======= How I know the HttpResponse.Body is HttpResponseStream =======
-
             First, HttpResponseStream is descended from Stream like this HttpResponseStream :> WriteOnlyStream :> Stream
                 ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http/HttpResponseStream.cs
                 ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Infrastructure/WriteOnlyStream.cs
@@ -66,30 +64,21 @@ module ResponseMutation =
                                         ref https://github.com/aspnet/HttpAbstractions/blob/release/2.1/src/Microsoft.AspNetCore.Http/Internal/DefaultHttpResponse.cs
                                             DefaultHttpResponse wraps IFeatureCollection in yet another FeatureReferences
                                             DefaultHttpResponse uses the wrapped IFeatureCollection's IHttpResponseFeature.Body as its Body
-
-
             ======= Tracing FlushAsync path =======
-
             HttpResponseStream.FlushAsync (and Flush too) calls IHttpResponseControl.FlushAsync
                 IHttpResponseControl in this case is HttpProtocol
                 ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http/HttpProtocol.cs
-
                 HttpProtocol.FlushAsync calls IHttpOutputProducer.FlushAsync
                     IHttpOutputProducer can be Http1OutputProducer or Http2OutputProducer
                     ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http/Http1OutputProducer.cs
                     ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http2/Http2OutputProducer.cs
-
         --->        Http1OutputProducer.FlushAsync calls PipeWriter.FlushAsync
         ===>        Http2OutputProducer.FlushAsync calls IHttp2FrameWriter.FlushAsync
                         IHttp2FrameWriter is actually Http2FrameWriter
                         ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http2/Http2FrameWriter.cs
-
-
             ======= Tracing WriteAsync path to verify that it converges with FlushAsync =======
-
             HttpResponseStream.WriteAsync (and Write too) calls IHttpResponseControl.WriteAsync
                 IHttpResponseProtocol is actually HttpProtocol
-
                 HttpProtocol.WriteAsync calls IHttpOutputProducer.WriteDataAsync or .WriteAsync (directly or thru WriteChunkedAsync)
                     (IHttpOutputProducer can be Http1OutputProducer or Http2OutputProducer)
                     
@@ -97,18 +86,13 @@ module ResponseMutation =
                     Http1OutputProducer.WriteAsync
         --->            Http1OutputProducer.WriteAsync<T> calls .FlushAsync on itself
         --->            Http1OutputProducer other "write async" methods call a private .WriteAsync which calls .FlushAsync on itself
-
                     Http2OutputProducer.WriteAsync throws
                     Http2OutputProducer.WriteDataAsync calls IHttp2FrameWriter.WriteDataAsync (which is Http2FrameWriter)
                         Http2FrameWriter.WriteDataAsync calls private WriteAsync
         ===>                private WriteAsync calls .FlushAsync on itself
-
-
             =======
-
             I still did not fully trace it from startup to make sure all of these pieces are used.
             But I can be reasonably sure from the above.
-
         *)
 
 
@@ -138,7 +122,7 @@ module ResponseMutation =
             writer response.Body
 
 
-        let applyMutations (httpContext : HttpContext) (response : RouteResponse) =
+        let applyMutations (httpContext : HttpContext) (response : Response) =
             let r = httpContext.Response
             // set status code
             statusCode response.StatusCode r
@@ -171,7 +155,7 @@ module ResponseMutation =
         // Request was handled, but the handler did not provide a response
         let noHandlerResponse =
             Responses.response [
-                Responses.statusCode 501
+                Responses.statusCodeInt 501
                 Responses.header "Xiphias-Info" "\"no response from route\""
             ]
 

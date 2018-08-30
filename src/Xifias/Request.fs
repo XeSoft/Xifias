@@ -1,6 +1,6 @@
 namespace Xifias
 
-module RequestHelp =
+module Request =
 
     open System
     open System.Net
@@ -238,7 +238,7 @@ module RequestHelp =
                 valuef v
 
 
-    /// Get whether this request is over HTTPS. This is verified by the presence of a secure connection rather than the URL scheme.
+    /// Get whether this request is over HTTPS.
     let isHttp (context : HttpContext) =
         context.Request.IsHttps
 
@@ -304,4 +304,3 @@ module RequestHelp =
         headerValue "Origin" context
             |> Option.bind stringValuesString
 
-    

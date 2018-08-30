@@ -15,8 +15,8 @@ module Middleware =
     // Request was not handled, but I was required to handle it
     let noRouteResponse =
         Responses.response [
-            Responses.statusCode 501
-            Responses.header "Xiphias-Info" "\"no matching route\""
+            Responses.statusCodeInt 501
+            Responses.header "Route-Info" "\"no matching route\""
         ]
             
 

@@ -5,7 +5,7 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Responses.fs" />
-    <Compile Include="RequestHelp.fs" />
+    <Compile Include="Request.fs" />
     <Compile Include="UrlParser.fs" />
     <Compile Include="Routing.fs" />
     <Compile Include="ResponseMutation.fs" />

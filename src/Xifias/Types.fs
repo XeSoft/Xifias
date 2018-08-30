@@ -14,7 +14,7 @@ module Types =
 
 
     // there really aren't that many pieces to an HTTP response
-    type RouteResponse =
+    type Response =
         {
             StatusCode : int
             StatusMessage : string option
@@ -32,10 +32,10 @@ module Types =
 
 
     type ResponseHandler =
-        | RespondNow of RouteResponse
-        | RespondAfter of handler:(HttpContext -> RouteResponse)
-        | RespondAfterAsync of handler:(HttpContext -> Async<RouteResponse>)
-        | RespondAfterTask of handler:(HttpContext -> Task<RouteResponse>)
+        | RespondNow of Response
+        | RespondAfter of handler:(HttpContext -> Response)
+        | RespondAfterAsync of handler:(HttpContext -> Async<Response>)
+        | RespondAfterTask of handler:(HttpContext -> Task<Response>)
 
 
     type RouteContext =
