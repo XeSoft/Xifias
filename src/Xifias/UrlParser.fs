@@ -1,9 +1,8 @@
-namespace Xifias
+﻿namespace Xifias
 
 // ported from https://github.com/evancz/url-parser
 // under BSD 3-clause license
 
-[<AutoOpen>]
 module UrlParser =
 
     open Microsoft.AspNetCore.Http
@@ -11,10 +10,10 @@ module UrlParser =
 
     type State<'a> =
         {
-            Visited : string list
-            Unvisited : string list
-            Params : IQueryCollection
-            Value : 'a
+            Visited: string list
+            Unvisited: string list
+            Params: IQueryCollection
+            Value: 'a
         }
 
 
@@ -38,7 +37,7 @@ module UrlParser =
                     Some value
 
 
-        let intParse s =
+        let intParse (s: string) =
             match System.Int32.TryParse s with
                 | false, _ ->
                     Error "not an integer"
@@ -47,7 +46,7 @@ module UrlParser =
                     Ok i
 
 
-        let guidParse s =
+        let guidParse (s: string) =
             match System.Guid.TryParse s with
                 | false, _ ->
                     Error "not a guid"
@@ -56,7 +55,7 @@ module UrlParser =
                     Ok guid
 
 
-        let getParam s (collection : IQueryCollection) =
+        let getParam s (collection: IQueryCollection) =
             match collection.TryGetValue s with
                 | false, _ ->
                     None
@@ -100,7 +99,7 @@ module UrlParser =
                             parseHelp rest
 
 
-        let splitUrl (s : string) =
+        let splitUrl (s: string) =
             match List.ofArray (s.Split('/')) with
                 | "" :: segments ->
                     segments
@@ -110,6 +109,7 @@ module UrlParser =
 
     
     (*
+    
         Path parsing
     *)
 
@@ -137,23 +137,24 @@ module UrlParser =
             )
 
 
-    let string<'a> : Parser<string -> 'a, 'a> =
+    let stringPath<'a> : Parser<string -> 'a, 'a> =
         custom (fun s -> if s = "" then Error "empty string" else Ok s)
 
 
-    let int<'a> : Parser<int -> 'a, 'a> =
+    let intPath<'a> : Parser<int -> 'a, 'a> =
         custom Internal.intParse
 
 
-    let guid<'a> : Parser<System.Guid -> 'a, 'a> =
+    let guidPath<'a> : Parser<System.Guid -> 'a, 'a> =
         custom Internal.guidParse
 
 
     (*
+    
         Parameter parsing
     *)
 
-    let s (st : string) =
+    let s (st: string) =
         Parser
             (
                 fun { Visited = visited; Unvisited = unvisited; Params = ps; Value = value } ->
@@ -233,11 +234,12 @@ module UrlParser =
 
 
     (*
+    
         Running a parse
     *)
 
     
-    let parse (Parser parser) ps url =
+    let parse (Parser parser) f ps url =
         Internal.parseHelp
             ( parser
                 (
@@ -245,11 +247,11 @@ module UrlParser =
                         Visited = []
                         Unvisited = Internal.splitUrl url
                         Params = ps
-                        Value = id
+                        Value = f
                     }
                 )
             )
 
 
-    let parseFromContext parser (context : HttpContext) =
-        parse parser context.Request.Query (context.Request.Path.ToString())
+    let parseFromContext parser f (context: HttpContext) =
+        parse parser f context.Request.Query (context.Request.Path.ToString())
