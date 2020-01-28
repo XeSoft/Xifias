@@ -1,16 +1,13 @@
-namespace Xifias
+﻿namespace Xifias
 
 [<AutoOpen>]
 module Routing =
 
-    open System.Threading.Tasks
     open Microsoft.AspNetCore.Http
     open Microsoft.Extensions.Primitives
-    open Types
-    open Responses
 
-
-    type RouteHandler = RouteContext -> RouteContext option
+    let some f x =
+        Some (f x)
 
 
     let andThen f x =
@@ -21,13 +18,14 @@ module Routing =
         f x |> andThen g
 
 
-    let orElse g f x =
+    let orTry g f x =
         match f x with
-            | None ->
-                g x
+        | None -> g x
+        | x ->    x
 
-            | x ->
-                x            
+
+    let withDefault value option =
+        Option.defaultValue value option
 
 
     let (>>=) x f = x |> andThen f
@@ -36,27 +34,24 @@ module Routing =
     let (>=>) f g = f |> composeWith g
 
 
-    let (<|>) f g = f |> orElse g
+    let (<|>) f g = f |> orTry g
 
 
-    let rec oneOf (handlers : ('a -> 'b option) list) (context : 'a) =
+    let rec oneOf (handlers: ('a -> 'b option) list) (context: 'a) =
         match handlers with
-            | [] ->
-                None
-
-            | handler :: remainingHandlers ->
-                match handler context with
-                    | Some resultContext ->
-                        Some resultContext
-
-                    | None ->
-                        oneOf remainingHandlers context                                  
+        | [] ->
+            None
+        | handler :: remainingHandlers ->
+            match handler context with
+            | Some resultContext ->
+                Some resultContext
+            | None ->
+                oneOf remainingHandlers context
 
 
-    let filter (keep : HttpContext -> bool) (context : RouteContext) =
-        if keep context.HttpContext then
+    let filter (keep: HttpContext -> bool) (context: HttpContext) =
+        if keep context then
             Some context
-
         else
             None
 
@@ -105,7 +100,7 @@ module Routing =
     /// The Host header should contain the domain name of the server and optionally a port number.
     /// NOTE: This value is may be provided by the client, rendering it insecure. Use with caution.
     /// </remarks>
-    let hostName (s : string) =
+    let hostName (s: string) =
         filterValue Request.hostName s
 
 
@@ -114,7 +109,7 @@ module Routing =
     /// The Host header should contain the domain name of the server and optionally a port number.
     /// NOTE: This value is may be provided by the client, rendering it insecure. Use with caution.
     /// </remarks>
-    let hostPort (i : int option) =
+    let hostPort (i: int option) =
         filterValue Request.hostPort i
 
 
@@ -130,12 +125,12 @@ module Routing =
 
 
     /// Match the request if it has the provided header name
-    let headerName (name : string) =
+    let headerName (name: string) =
         filter (Request.hasHeaderName name)
 
 
     /// Match the request if it has the provided header and value.
-    let headerValue (name : string) (value : string) =
+    let headerValue (name: string) (value: string) =
         headerValueFilter name (fun v -> v = StringValues(value))
 
 
@@ -150,7 +145,7 @@ module Routing =
     ///         <|> clientIpFromHeader "X-Real-IP" ipString
     /// </code>
     /// </remarks>
-    let clientIpFromHeader (headerName : string) (ipString : string) =
+    let clientIpFromHeader (headerName: string) (ipString: string) =
         filter (
             Request.clientIpFromHeader headerName
                 >> Option.map (fun ip -> Some ip = Request.parseIp ipString)
@@ -159,7 +154,7 @@ module Routing =
 
 
     /// Match the request if it has the provided content type.
-    let contentType (typeName : string) =
+    let contentType (typeName: string) =
         filterValue Request.contentType (Some typeName)
 
 
@@ -184,8 +179,8 @@ module Routing =
 
 
     /// Match the request if it is using the HTTPS protocol.
-    let isHttps =
-        filter Request.isHttp
+    let isHttps builder =
+        filter Request.isHttp builder
 
 
     /// Match the request if it uses the provided scheme. For example: in http://my.foo:123/bar, "http" is the scheme
@@ -199,22 +194,22 @@ module Routing =
 
 
     /// Match the request if it uses the provide HTTP method. Examples: GET, POST
-    let httpVerb (verb : string) =
-        filterValue Request.verb verb
+    let httpVerb (verb: string) builder =
+        filterValue Request.verb verb builder
 
 
     /// Match the request if it uses the GET method.
-    let GET     : RouteHandler = httpVerb "GET"
+    let GET     x = httpVerb "GET" x
     /// Match the request if it uses the POST method.
-    let POST    : RouteHandler = httpVerb "POST"
+    let POST    x = httpVerb "POST" x
     /// Match the request if it uses the PUT method.
-    let PUT     : RouteHandler = httpVerb "PUT"
+    let PUT     x = httpVerb "PUT" x
     /// Match the request if it uses the PATCH method.
-    let PATCH   : RouteHandler = httpVerb "PATCH"
+    let PATCH   x = httpVerb "PATCH" x
     /// Match the request if it uses the DELETE method.
-    let DELETE  : RouteHandler = httpVerb "DELETE"
+    let DELETE  x = httpVerb "DELETE" x
     /// Match the request if it uses the OPTIONS method.
-    let OPTIONS : RouteHandler = httpVerb "OPTIONS"
+    let OPTIONS x = httpVerb "OPTIONS" x
 
 
     /// Match the request if it uses the exact provided path, case insensitive.
@@ -223,117 +218,68 @@ module Routing =
 
 
     /// Match the request if it starts with the provided path, case insensitive.
-    let pathPrefix s (context : RouteContext) =
+    let pathPrefix s (context: HttpContext) =
         filter (fun x -> x.Request.Path.StartsWithSegments(PathString(s))) context
 
 
     /// Match the request if it matches the provided parser. Parsed parameters are passed into the provided function.
-    let pathParse parser f (context : RouteContext) : RouteContext option =
-        UrlParser.parseFromContext (UrlParser.map f parser) context.HttpContext
-            |> Option.bind (fun h -> h context)
+    let pathApply parser f (context: HttpContext) : _ option =
+        match UrlParser.parseFromContext parser f context with
+        | Some run ->
+            Some (run, context)
+        | None ->
+            None
 
 
     /// Match the request if it has an authenticated user.
     /// Authentication is expected to be handled by other middleware, such as Microsoft.AspNetCore.Authentication.*.
-    let authenticated =
+    let authenticated builder =
         filter (
             fun x ->
                 not (isNull x.User)
                 && not (isNull x.User.Identity)
                 && x.User.Identities |> Seq.exists (fun u -> u.IsAuthenticated)
-        )
+        ) builder
 
 
     /// Match the request if it has a user with the given type of claim.
     /// Populating claims is expected to be handled by other middleware, such as Microsoft.AspNetCore.Authentication.*.
-    let claimType (typeName : string) =
+    let claimType (typeName: string) =
         filter (Request.hasClaimOfType typeName)
 
 
     /// Match the request if it has a user with the given exact claim (type and value).
     /// Populating claims is expected to be handled by other middleware, such as Microsoft.AspNetCore.Authentication.*.
-    let claim (typeName: string) (value : string) =
+    let claim (typeName: string) (value: string) =
         filter (Request.hasClaim typeName value)
-            
-
-    let private ifNotResponded response (context : RouteContext) =
-        match context.Handler with
-            | Some (RespondNow _) ->
-                Some context // ignore new response
-
-            | _ ->
-                Some { context with Handler = Some response }
 
 
-    /// Set the synchronous handler which will process this request. This handler will not be executed until after all parts of the route are matched.
-    let handler (func : HttpContext -> Response) (context : RouteContext) =
-        ifNotResponded (RespondAfter func) context
+    // URL parsing aliases
 
+    /// Path segment with a fixed string value
+    let s = UrlParser.s
 
-    /// Set the Async-returning handler which will process this request. This handler will not be executed until after all parts of the route are matched.
-    let handlerAsync (func : HttpContext -> Async<Response>) (context : RouteContext) =
-        ifNotResponded (RespondAfterAsync func) context
-    
+    /// Divides one path segment from another
+    let (</>) = UrlParser.(</>)
 
-    /// Set the Task-returning handler which will process the request. This handler will not be executed until after all parts of the route are matched.
-    let handlerTask (func : HttpContext -> Task<Response>) (context : RouteContext) =
-        ifNotResponded (RespondAfterTask func) context
+    /// Divides one query parameter from another. Also divides url path from first query parameter.
+    let (<?>) = UrlParser.(<?>)
 
+    /// Path segment must be an integer
+    let int<'a> = UrlParser.intPath<'a>
 
-    /// Return the provided response.
-    let respond (response : Response) (context : RouteContext) =
-        ifNotResponded (RespondAfter (fun _ -> response)) context
+    /// Path segment must be a string
+    let string<'a> = UrlParser.stringPath<'a>
 
+    /// Path segment must be a GUID
+    let guid<'a> = UrlParser.guidPath<'a>
 
-    /// Return the provided response description.
-    let respondWith (responseItems : (Response -> Response) list) (context : RouteContext) =
-        ifNotResponded (RespondAfter (fun _ -> response responseItems)) context
+    /// Query parameter must be an integer
+    let intParam = UrlParser.intParam
 
+    /// Query parameter must be a string
+    let stringParam = UrlParser.stringParam
 
-    /// Stop matching routes and return the provided response immediately.
-    let stop (response : Response) (context : RouteContext) =
-        ifNotResponded (RespondNow response) context
+    /// Query parameter must be a guid
+    let guidParam = UrlParser.guidParam
 
-
-    /// Stop matching routes and return the provided response description immediately.
-    let stopWith (responseItems : (Response -> Response) list) (context : RouteContext) =
-        ifNotResponded (RespondNow (response responseItems)) context
-
-
-    /// Match the route when there is an authenticated user present on the request.
-    /// If there is no authenticated user, stop matching other routes and return a 401 immediately.
-    let stopUnlessAuthenticated =
-        authenticated
-            <|> stopWith [ statusCodeInt 401 ]
-
-
-    /// Match the route when there is a user with the provided claim type present on the request.
-    /// If the claim type is not present, stop matching other routes and return 403 immediately.
-    let stopUnlessClaimType (typeName : string) =
-        claimType typeName
-            <|> stopWith [ statusCodeInt 403 ]
-
-
-    /// Match the route when there is a user with the exact provided claim present on the request.
-    /// If the exact claim is not present, stop matching other routes and return 403 immediately.
-    let stopUnlessClaim (typeName : string) (value : string) =
-        claim typeName value
-            <|> stopWith [ statusCodeInt 403 ]
-
-
-    /// Matches the route when it is over a secure connection.
-    /// If a secure connection is not present, stop matching other routes and respond with a permanent redirect to the same URL, but with the "https" scheme.
-    let redirectIfNotHttps =
-        isHttps
-            <|> fun context ->
-                    let r = context.HttpContext.Request
-                    let location =
-                        System.Text.StringBuilder()
-                            .Append("https://")
-                            .Append(r.Host)
-                            .Append(r.PathBase)
-                            .Append(r.Path)
-                            .Append(r.QueryString)
-                            .ToString()
-
-                    stopWith [ redirectPermanent location ] context
