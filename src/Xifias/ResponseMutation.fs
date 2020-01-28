@@ -1,4 +1,4 @@
-namespace Xifias
+﻿namespace Xifias
 
 module ResponseMutation =
 
@@ -12,18 +12,18 @@ module ResponseMutation =
 
 
     module List =
-        
+
         let iterReverse f list =
             List.foldBack (fun item () -> f item) list ()
 
 
     module Mutate =
-        
-        let statusCode i (response : HttpResponse) =
+
+        let statusCode i (response: HttpResponse) =
             response.StatusCode <- i
 
 
-        let statusMessage s (response : HttpResponse) =
+        let statusMessage s (response: HttpResponse) =
             response
                 .HttpContext
                 .Features
@@ -31,12 +31,12 @@ module ResponseMutation =
                 .ReasonPhrase <- s
 
 
-        let addHeader key value (response : HttpResponse) =
+        let addHeader key value (response: HttpResponse) =
             response.Headers.[key] <- StringValues(value.ToString())
 
 
         (*
-        
+
             I chased down the Kestrel source code (shown below) to make sure I don't have to flush the stream.
             Confirmed: The stream is automatically flushed on both HTTP 1 and HTTP 2 protocols.
             ======= How I know the HttpResponse.Body is HttpResponseStream =======
@@ -81,7 +81,7 @@ module ResponseMutation =
                 IHttpResponseProtocol is actually HttpProtocol
                 HttpProtocol.WriteAsync calls IHttpOutputProducer.WriteDataAsync or .WriteAsync (directly or thru WriteChunkedAsync)
                     (IHttpOutputProducer can be Http1OutputProducer or Http2OutputProducer)
-                    
+
                     Http1OutputProducer.WriteDataAsync calls .WriteAsync on itself
                     Http1OutputProducer.WriteAsync
         --->            Http1OutputProducer.WriteAsync<T> calls .FlushAsync on itself
@@ -96,7 +96,7 @@ module ResponseMutation =
         *)
 
 
-        let setBody (stream : Stream) (response : HttpResponse) =
+        let setBody (stream: Stream) (response: HttpResponse) =
             // reset position to beginning
             if stream.CanSeek then
                 stream.Position <- 0L
@@ -106,7 +106,7 @@ module ResponseMutation =
                 statusCode 501 response
                 addHeader "Xiphias-Info" "\"body input stream was not readable\"" response
                 Task.CompletedTask
-            else             
+            else
                 stream.CopyToAsync(response.Body)
 
 
@@ -114,40 +114,44 @@ module ResponseMutation =
         // ref https://github.com/aspnet/KestrelHttpServer/blob/release/2.1/src/Kestrel.Core/Internal/Http/HttpResponseStream.cs#L66
 
 
-        let writeBodyAsync (writer : Stream -> Async<unit>) (response : HttpResponse) =
+        let writeBodyAsync (writer: Stream -> Async<unit>) (response: HttpResponse) =
             Async.StartAsTask (writer response.Body) :> Task
 
 
-        let writeBodyTask (writer : Stream -> Task) (response : HttpResponse) =
+        let writeBodyTask (writer: Stream -> Task) (response: HttpResponse) =
             writer response.Body
 
 
-        let applyMutations (httpContext : HttpContext) (response : Response) =
-            let r = httpContext.Response
-            // set status code
-            statusCode response.StatusCode r
+        let applyMutations (httpContext: HttpContext) (responseType: ResponseType) =
+            match responseType with
+            | ManualResponse ->
+                Task.CompletedTask
+            | Response response ->
+                let r = httpContext.Response
+                // set status code
+                statusCode response.StatusCode r
 
-            // set status message
-            Option.iter (fun s -> statusMessage s r) response.StatusMessage
-            
-            // set headers
-            List.iterReverse // they are added in reverse order
-                (fun (key, value) -> addHeader key value r)
-                response.Headers
+                // set status message
+                Option.iter (fun s -> statusMessage s r) response.StatusMessage
 
-            // body will always return Task
-            match response.Body with
-                | None ->
-                    Task.CompletedTask
+                // set headers
+                List.iterReverse // they are added in reverse order
+                    (fun (key, value) -> addHeader key value r)
+                    response.Headers
 
-                | Some (SetBodyStream stream) ->
-                    setBody stream r
+                // body will always return Task
+                match response.Body with
+                    | None ->
+                        Task.CompletedTask
 
-                | Some (WriteBodyStreamAsync f) ->
-                    writeBodyAsync f r
+                    | Some (SetBodyStream stream) ->
+                        setBody stream r
 
-                | Some (WriteBodyStreamTask f) ->
-                    writeBodyTask f r
+                    | Some (WriteBodyStreamAsync f) ->
+                        writeBodyAsync f r
+
+                    | Some (WriteBodyStreamTask f) ->
+                        writeBodyTask f r
 
 
     module Internal =
@@ -160,27 +164,33 @@ module ResponseMutation =
             ]
 
 
-    let setResponse (context : RouteContext) =
+    let setResponse (context: HttpContext) (responseType: Handling) =
+        match responseType with
+        | HandleSync response ->
+            Mutate.applyMutations context response
+        | HandleTask responseTask ->
+            task {
+                let! response = responseTask
+                do! Mutate.applyMutations context response
+            } :> Task
+        | HandleAsync responseAsync ->
+            task {
+                let! response = Async.StartAsTask responseAsync
+                do! Mutate.applyMutations context response
+            } :> Task
 
-        match context.Handler with
-            | None ->
-                Mutate.applyMutations context.HttpContext Internal.noHandlerResponse
 
-            | Some (RespondNow response) ->
-                Mutate.applyMutations context.HttpContext response
-
-            | Some (RespondAfter handler) ->
-                let response = handler context.HttpContext
-                Mutate.applyMutations context.HttpContext response
-
-            | Some (RespondAfterAsync handler) ->
-                task {
-                    let! response = Async.StartAsTask (handler context.HttpContext)
-                    do! Mutate.applyMutations context.HttpContext response
-                } :> Task
-
-            | Some (RespondAfterTask handler) ->
-                task {
-                    let! response = handler context.HttpContext
-                    do! Mutate.applyMutations context.HttpContext response
-                } :> Task
+    let fromResponse (context: HttpContext) responseType =
+        match responseType with
+        | HandleSync response ->
+            Mutate.applyMutations context response
+        | HandleAsync responseA ->
+            task {
+                let! response = Async.StartAsTask responseA
+                do! Mutate.applyMutations context response
+            } :> Task
+        | HandleTask responseT ->
+            task {
+                let! response = responseT
+                do! Mutate.applyMutations context response
+            } :> Task
