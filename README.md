@@ -2,8 +2,6 @@
 
 Functional web routing on Kestrel
 
-> This document is an incomplete draft.
-
 ## Why?
 
 I could not find exactly what I wanted in Suave and Giraffe. So I made Xifias to reuse in my own projects.
@@ -32,25 +30,10 @@ Here are some bullet point differences.
   _Kestrel requires HttpContext to be mutated to respond, so changes are applied after all decisions are made._
 
 * (similar to Suave) Simple route filters -- return None if it does not match
-    
-  ```fsharp
-  // equivalent to build-in `path` function
-  let path s (context : RouteContext) : RouteContext option =
-      if context.HttpContext.Request.Path.Equals(PathString(s))) then
-          Some context
 
-      else
-          None
+# This documentation is outdated.
 
-  // only respond if path is "/hello"
-  POST >=> path "/hello" >=>
-      stopWith [
-          statusCode 200
-          contentText "hi back!"
-      ]
-  ```
-
-
+I updated the source on 1/27/2020 with changes that we have made for production. This message will go away when I get time to update this document.
 
 ## Show me what it looks like
 
