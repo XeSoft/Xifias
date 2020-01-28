@@ -4,7 +4,6 @@ namespace Xifias
 module Types =
 
     open System.Threading.Tasks
-    open Microsoft.AspNetCore.Http
 
 
     type ResponseBody =
@@ -13,13 +12,12 @@ module Types =
         | WriteBodyStreamTask of (System.IO.Stream -> Task)
 
 
-    // there really aren't that many pieces to an HTTP response
     type Response =
         {
-            StatusCode : int
-            StatusMessage : string option
-            Headers : (string * obj) list
-            Body : ResponseBody option
+            StatusCode: int
+            StatusMessage: string option
+            Headers: (string * obj) list
+            Body: ResponseBody option
         }
             with
                 static member ok =
@@ -31,15 +29,12 @@ module Types =
                     }
 
 
-    type ResponseHandler =
-        | RespondNow of Response
-        | RespondAfter of handler:(HttpContext -> Response)
-        | RespondAfterAsync of handler:(HttpContext -> Async<Response>)
-        | RespondAfterTask of handler:(HttpContext -> Task<Response>)
+    type ResponseType =
+        | ManualResponse
+        | Response of Response
 
 
-    type RouteContext =
-        {
-            HttpContext : HttpContext
-            Handler : ResponseHandler option
-        }
+    type Handling =
+        | HandleSync of ResponseType
+        | HandleAsync of Async<ResponseType>
+        | HandleTask of Task<ResponseType>
