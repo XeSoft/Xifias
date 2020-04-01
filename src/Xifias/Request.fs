@@ -279,29 +279,29 @@ module Request =
     /// Get claims of the provided type from the user present on the request. Multiple of the same claim may be present.
     let claimsOfType (name: string) (context: HttpContext) =
         claims context
-            |> Seq.filter (fun x -> x.Type = name)
+        |> Seq.filter (fun x -> x.Type = name)
 
 
     /// Get the first claim of the provided type from the user present on the request.
     let claimOfType (name: string) (context: HttpContext) =
         claimsOfType name context
-            |> Seq.tryHead
+        |> Seq.tryHead
 
 
     /// If the user present on the request has a claim of the provided type, returns true. Otherwise returns false.
     let hasClaimOfType (name: string) (context: HttpContext)= 
         claimsOfType name context
-            |> (not << Seq.isEmpty)
+        |> (not << Seq.isEmpty)
 
 
     /// If the user present on the request has the exact claim provided, returns true. Otherwise returns false.
     let hasClaim (name: string) (value: string) (context: HttpContext) =
         claims context
-            |> Seq.exists (fun x -> x.Type = name && x.Value = value)
+        |> Seq.exists (fun x -> x.Type = name && x.Value = value)
 
 
     /// Get the origin for the request.
     let origin (context: HttpContext) =
         headerValue "Origin" context
-            |> Option.bind stringValuesString
+        |> Option.bind stringValuesString
 
